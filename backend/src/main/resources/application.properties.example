@@ -1,0 +1,23 @@
+# Copy to application.properties and set LLM_API_KEY for AI routing
+
+server.port=8080
+
+spring.datasource.url=jdbc:h2:mem:ziprun;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+spring.datasource.driver-class-name=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
+
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.defer-datasource-initialization=true
+spring.sql.init.mode=always
+spring.h2.console.enabled=true
+
+# ruleBased (default, no API key) | ai
+routing.strategy=ruleBased
+
+llm.provider=groq
+llm.api-key=${LLM_API_KEY}
+llm.model=llama-3.1-8b-instant
+llm.base-url=https://api.groq.com
+llm.timeout-seconds=15

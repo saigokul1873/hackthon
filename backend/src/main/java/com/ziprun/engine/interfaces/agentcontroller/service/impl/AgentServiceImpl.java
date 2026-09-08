@@ -4,13 +4,13 @@ import com.ziprun.engine.utils.domain.Agent;
 import com.ziprun.engine.utils.enums.AgentStatus;
 import com.ziprun.engine.utils.event.AgentOfflineEvent;
 import com.ziprun.engine.utils.repository.AgentRepository;
+import com.ziprun.engine.exception.ZycusErrorCode;
 import com.ziprun.engine.interfaces.agentcontroller.service.AgentService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -27,7 +27,8 @@ public class AgentServiceImpl implements AgentService {
     @Override
     @Transactional
     public Agent updateStatus(String id, AgentStatus newStatus) {
-        Agent agent = agentRepository.findById(id).orElseThrow(() -> new NoSuchElementException("Agent not found: " + id));
+        Agent agent = agentRepository.findById(id)
+                .orElseThrow(() -> ZycusErrorCode.AGENT_NOT_FOUND.exception(id));
         
         if (agent.getStatus() == newStatus) {
             return agent; // Idempotent: status is already set

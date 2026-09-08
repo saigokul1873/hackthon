@@ -12,26 +12,25 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.NoSuchElementException;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(NoSuchElementException.class)
-    public ResponseEntity<Map<String, Object>> handleNotFound(NoSuchElementException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("status", HttpStatus.NOT_FOUND.value());
-        body.put("error", "Not Found");
-        body.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    @ExceptionHandler(ZycusException.class)
+    public ResponseEntity<ZycusResponse> handleZycusException(ZycusException ex) {
+        ZycusResponse response = new ZycusResponse();
+        response.setStatusCode(ex.getStatusCode());
+        response.setStatusMessage(ex.getStatusMessage());
+        log.error("ZycusException [{}]: {}", ex.getStatusCode(), ex.getStatusMessage());
+        return ResponseEntity.status(ex.getHttpStatus()).body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, Object> errors = new HashMap<>();
-        ex.getBindingResult().getFieldErrors().forEach(error -> 
-            errors.put(error.getField(), error.getDefaultMessage()));
+        ex.getBindingResult().getFieldErrors().forEach(error ->
+                errors.put(error.getField(), error.getDefaultMessage()));
 
         Map<String, Object> body = new HashMap<>();
         body.put("status", HttpStatus.BAD_REQUEST.value());
@@ -41,20 +40,11 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-        body.put("error", "Internal Server Error");
-        body.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
-    }
-
-    @ExceptionHandler(ZycusException.class)
-    public ResponseEntity<ZycusResponse> handleZycusException(ZycusException ex) {
+    public ResponseEntity<ZycusResponse> handleGeneral(Exception ex) {
+        log.error("Unhandled exception", ex);
         ZycusResponse response = new ZycusResponse();
-        response.setStatusCode(ex.getStatusCode());
-        response.setStatusMessage(ex.getStatusMessage());
-        log.error("ERROR in engine for Zycus exception:- {}", response);
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        response.setStatusCode("E9999");
+        response.setStatusMessage("Internal server error");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }

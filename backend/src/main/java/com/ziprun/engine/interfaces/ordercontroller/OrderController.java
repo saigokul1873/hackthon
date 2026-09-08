@@ -1,6 +1,7 @@
 package com.ziprun.engine.interfaces.ordercontroller;
 
 import com.ziprun.engine.interfaces.ordercontroller.model.CreateOrderRequest;
+import com.ziprun.engine.interfaces.ordercontroller.model.OrderStatusUpdateRequest;
 import com.ziprun.engine.utils.domain.Order;
 import com.ziprun.engine.utils.domain.ReassignmentSuggestion;
 import com.ziprun.engine.utils.enums.OrderStatus;
@@ -37,8 +38,14 @@ public class OrderController {
         return ResponseEntity.ok(orderService.suggestForOrder(id));
     }
 
-    @PostMapping("/{id}/suggest/stream")
+    @GetMapping("/{id}/suggest/stream")
     public SseEmitter streamSuggestion(@PathVariable String id) {
         return orderService.streamSuggestion(id);
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Order> updateOrderStatus(@PathVariable String id,
+                                                   @Valid @RequestBody OrderStatusUpdateRequest request) {
+        return ResponseEntity.ok(orderService.updateOrderStatus(id, request));
     }
 }

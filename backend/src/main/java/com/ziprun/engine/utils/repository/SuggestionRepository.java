@@ -12,4 +12,6 @@ import java.util.List;
 public interface SuggestionRepository extends JpaRepository<ReassignmentSuggestion, Long> {
     boolean existsByOrderIdAndStatusAndTriggerReason(String orderId, SuggestionStatus status, TriggerReason triggerReason);
     List<ReassignmentSuggestion> findByStatus(SuggestionStatus status);
+    java.util.Optional<ReassignmentSuggestion> findFirstByOrderIdAndStatusAndTriggerReason(
+            String orderId, SuggestionStatus status, TriggerReason triggerReason);
 }

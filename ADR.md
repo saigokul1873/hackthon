@@ -1,5 +1,7 @@
 # Architecture Decision Records
 
+> Also available at `backend/ADR.md`
+
 ## ADR-1: Where does routing logic live?
 **Context**
 The core functionality of this engine is reassigning stranded orders to available agents. We needed to decide where this complex logic (handling rules, calling external AI services, managing fallback logic) should reside.
@@ -44,7 +46,7 @@ When a manager sets an agent to OFFLINE via `PATCH /agents/{id}/status`, that HT
 (b) A manual thread pool (`CompletableFuture.runAsync()`) inside the controller.
 (c) Spring's `ApplicationEventPublisher` with an `@Async` annotated `@EventListener`.
 **Decision**
-Chose option (c) — Spring Application Events. The `AgentService` publishes an `AgentOfflineEvent` when status changes to OFFLINE. The `AgentOfflineEventListener` catches it asynchronously. This guarantees the HTTP thread is immediately freed and cleanly decouples the "state change" from the "reaction". Idempotency is handled by checking if a `PENDING` suggestion already exists for the stranded order with `triggerReason = AGENT_OFFLINE`.
+Chose option (c) — Spring Application Events with `@TransactionalEventListener(AFTER_COMMIT)`. The `AgentService` publishes an `AgentOfflineEvent` when status changes to OFFLINE. The `AgentOfflineEventListener` catches it asynchronously on a dedicated thread pool. Idempotency is handled by checking if a `PENDING` suggestion already exists for the stranded order with `triggerReason = AGENT_OFFLINE`.
 **Tradeoffs accepted**
 Async events in Spring happen outside the original transaction boundary. If the `AgentOfflineEventListener` fails unexpectedly, the agent remains OFFLINE but no reassignments are suggested. We accept this because our fallback strategy makes failures highly unlikely, and a simple dashboard refresh allows manual intervention.
 
@@ -52,16 +54,15 @@ Async events in Spring happen outside the original transaction boundary. If the 
 **Context**
 Sprint 2 introduces `zoneId` and `capacity`. Sprint 3 introduces SLA-breach proactive re-planning and a full dispatch board. We need to prepare for these without over-engineering today.
 **Decision & Extension Seam**
-- **Extension Seam:** The `RoutingStrategy.suggest(Order order, List<Agent> availableAgents, TriggerReason triggerReason)` interface is perfectly shaped for Sprint 2. We've already added nullable `zoneId` and `maxCapacity`/`weightClass` fields to the Domain Models. When `ZoneAffinityStrategy` arrives, it can simply read `order.getWeightClass()` and `agent.getZoneId()` from the existing models without changing the interface contract.
-- **Deliberate Exclusion:** We intentionally deferred building the full dispatch board and the proactive SLA-breach loop. The agentic loop (reassigning stranded orders quickly) is a critical correctness requirement for the core domain. The full board is a visibility enhancement that can be built on top of the existing `GET /orders` API. The SLA-breach loop will naturally fit in as a scheduled task that simply publishes a new `OrderSLABreachEvent`, reusing our entire event-driven architecture.
+- **Extension Seam:** The `RoutingStrategy.suggest()` interface with `RoutingContext` is shaped for Sprint 2. Nullable `zoneId`, `maxCapacity`, and `weightClass` fields exist on domain models. `ZoneAffinityStrategy` plugs in via `@Component("zoneAffinity")` with no changes to selection logic.
+- **Deliberate Exclusion:** We deferred the full dispatch board and proactive SLA-breach loop. The agentic loop is a correctness requirement; the board is a visibility enhancement on top of `GET /orders`. SLA-breach would publish an `OrderSLABreachEvent` reusing the same event architecture.
 
 ## ADR-6: Frontend Framework Choice
 **Context**
-The Ops interface needs to be built rapidly while ensuring modern reactive capabilities, such as polling and SSE streaming for the Agentic loop visibility.
+The Ops interface needs to be built rapidly while ensuring polling and SSE streaming for agentic loop visibility.
 **Options considered**
-(a) React 18
-(b) Angular 17
+(a) React 18 (b) Angular 17
 **Decision**
-Chose option (a) — React 18. The component-driven architecture of React, combined with Vite for rapid development and pure vanilla CSS for styling, allowed for incredibly fast iteration. React's `useEffect` cleanly handles both the 5-second polling interval and the `EventSource` connection required for the SSE live streaming feature.
+Chose React 18 with Vite. `useEffect` handles 5-second polling; `EventSource` handles SSE streaming for the AI Reassign button.
 **Tradeoffs accepted**
-React is less opinionated than Angular, meaning we had to manually manage state (via `useState`) and API calls rather than relying on a structured service layer. However, for a single-page ops dashboard, the lightweight flexibility of React vastly outweighed the heavier boilerplate of Angular.
+Manual state management via `useState` instead of Angular's structured services — acceptable for a single-page ops dashboard.

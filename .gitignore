@@ -12,9 +12,6 @@ frontend/dist/
 .env.*
 !.env.example
 
-# Spring Boot local configuration / secrets
-backend/src/main/resources/application.properties
-
 # IDE
 .idea/
 *.iml

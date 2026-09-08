@@ -9,12 +9,12 @@ import com.ziprun.engine.utils.enums.SuggestionStatus;
 import com.ziprun.engine.utils.repository.AgentRepository;
 import com.ziprun.engine.utils.repository.OrderRepository;
 import com.ziprun.engine.utils.repository.SuggestionRepository;
+import com.ziprun.engine.exception.ZycusErrorCode;
 import com.ziprun.engine.interfaces.suggestioncontroller.service.SuggestionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -33,7 +33,12 @@ public class SuggestionServiceImpl implements SuggestionService {
     @Transactional
     public ReassignmentSuggestion updateSuggestionStatus(Long id, SuggestionStatus newStatus) {
         ReassignmentSuggestion suggestion = suggestionRepository.findById(id)
-            .orElseThrow(() -> new NoSuchElementException("Suggestion not found: " + id));
+                .orElseThrow(() -> ZycusErrorCode.SUGGESTION_NOT_FOUND.exception(String.valueOf(id)));
+
+        if (suggestion.getStatus() != SuggestionStatus.PENDING) {
+            throw ZycusErrorCode.SUGGESTION_ALREADY_PROCESSED.exception(suggestion.getStatus().name());
+        }
+
         suggestion.setStatus(newStatus);
 
         if (newStatus == SuggestionStatus.ACCEPTED) {
@@ -42,7 +47,7 @@ public class SuggestionServiceImpl implements SuggestionService {
             Agent newAgent = suggestion.getRecommendedAgent();
 
             if (oldAgent != null) {
-                oldAgent.setActiveOrderCount(oldAgent.getActiveOrderCount() - 1);
+                oldAgent.setActiveOrderCount(Math.max(0, oldAgent.getActiveOrderCount() - 1));
                 if (oldAgent.getActiveOrderCount() == 0 && oldAgent.getStatus() == AgentStatus.BUSY) {
                     oldAgent.setStatus(AgentStatus.AVAILABLE);
                 }
@@ -57,6 +62,10 @@ public class SuggestionServiceImpl implements SuggestionService {
 
             order.setAssignedAgent(newAgent);
             order.setStatus(OrderStatus.REASSIGNED);
+            orderRepository.save(order);
+        } else if (newStatus == SuggestionStatus.REJECTED) {
+            Order order = suggestion.getOrder();
+            order.setStatus(OrderStatus.ASSIGNED);
             orderRepository.save(order);
         }
 

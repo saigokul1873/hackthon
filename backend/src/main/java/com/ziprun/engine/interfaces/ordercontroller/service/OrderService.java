@@ -1,6 +1,7 @@
 package com.ziprun.engine.interfaces.ordercontroller.service;
 
 import com.ziprun.engine.interfaces.ordercontroller.model.CreateOrderRequest;
+import com.ziprun.engine.interfaces.ordercontroller.model.OrderStatusUpdateRequest;
 import com.ziprun.engine.utils.domain.Order;
 import com.ziprun.engine.utils.domain.ReassignmentSuggestion;
 import com.ziprun.engine.utils.enums.OrderStatus;
@@ -13,4 +14,5 @@ public interface OrderService {
     Order createOrder(CreateOrderRequest request);
     ReassignmentSuggestion suggestForOrder(String orderId);
     SseEmitter streamSuggestion(String orderId);
+    Order updateOrderStatus(String orderId, OrderStatusUpdateRequest request);
 }
