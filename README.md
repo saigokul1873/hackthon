@@ -60,6 +60,8 @@ Frontend runs at **http://localhost:5173**
 | GET | `/suggestions` | List pending suggestions |
 | PATCH | `/suggestions/{id}` | Accept or reject suggestion |
 | GET | `/routing/strategy` | Active routing strategy + available strategies |
+| PATCH | `/routing/strategy` | Switch routing strategy at runtime (`{"strategy":"ai"}`) |
+| GET | `/actuator/health` | Health check (Spring Actuator) |
 
 ## Configuration
 

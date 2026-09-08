@@ -20,7 +20,7 @@ We have a `RuleBasedStrategy` and an `AIRoutingStrategy`. We need to switch betw
 (b) Spring's `@Qualifier` and manual bean injection.
 (c) Auto-wired `Map<String, RoutingStrategy>` populated by Spring, keyed by bean name.
 **Decision**
-Chose option (c). We inject `Map<String, RoutingStrategy> strategies` into the `RoutingService`. The active strategy name is read from `routing.strategy` (or `routing.active-strategy`) via Spring's `Environment` on **every call**, so changing the env var `ROUTING_STRATEGY` switches behavior without a restart. To add `ZoneAffinityStrategy` in Sprint 2, we just create the class and annotate it with `@Component("zoneAffinity")`.
+Chose option (c). We inject `Map<String, RoutingStrategy> strategies` into `RoutingService` via `RoutingStrategyHolder`. The active strategy is read on every call and can be overridden at runtime via `PATCH /routing/strategy` or env var `ROUTING_STRATEGY` — no restart required.
 **Tradeoffs accepted**
 Since Spring populates the map automatically by bean name, it's slightly less explicit than a manual factory. Also, if the strategy property is misspelled, it will throw a runtime exception. We mitigated this with a startup validation check in the `RoutingService` constructor.
 

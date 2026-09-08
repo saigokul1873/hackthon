@@ -3,14 +3,14 @@ package com.ziprun.engine.utils.event;
 import com.ziprun.engine.utils.domain.Agent;
 import com.ziprun.engine.utils.domain.Order;
 import com.ziprun.engine.utils.domain.ReassignmentSuggestion;
-import com.ziprun.engine.utils.enums.AgentStatus;
 import com.ziprun.engine.utils.enums.OrderStatus;
 import com.ziprun.engine.utils.enums.SuggestionStatus;
 import com.ziprun.engine.utils.enums.TriggerReason;
-import com.ziprun.engine.utils.repository.AgentRepository;
 import com.ziprun.engine.utils.repository.OrderRepository;
 import com.ziprun.engine.utils.repository.SuggestionRepository;
 import com.ziprun.engine.utils.routing.RoutingContext;
+import com.ziprun.engine.utils.routing.RuleBasedStrategy;
+import com.ziprun.engine.utils.service.AgentAvailabilityService;
 import com.ziprun.engine.utils.service.RoutingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 
@@ -32,9 +31,10 @@ public class AgentOfflineEventListener {
     private static final Logger log = LoggerFactory.getLogger(AgentOfflineEventListener.class);
 
     private final OrderRepository orderRepository;
-    private final AgentRepository agentRepository;
     private final SuggestionRepository suggestionRepository;
     private final RoutingService routingService;
+    private final RuleBasedStrategy ruleBasedStrategy;
+    private final AgentAvailabilityService agentAvailabilityService;
 
     @Async("taskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -53,10 +53,7 @@ public class AgentOfflineEventListener {
             return;
         }
 
-        List<Agent> availableAgents = agentRepository.findByStatusIn(
-                Arrays.asList(AgentStatus.AVAILABLE, AgentStatus.BUSY));
-        availableAgents.removeIf(a -> a.getId().equals(offlineAgentId));
-
+        List<Agent> availableAgents = agentAvailabilityService.findEligibleAgents(offlineAgentId);
         RoutingContext context = RoutingContext.forOfflineAgent(offlineAgentId, affectedOrders.size());
 
         for (Order order : affectedOrders) {
@@ -80,22 +77,37 @@ public class AgentOfflineEventListener {
         order.setStatus(OrderStatus.REASSIGNMENT_PENDING);
         orderRepository.save(order);
 
-        List<ReassignmentSuggestion> suggestions = routingService.suggestReassignment(
-                order, availableAgents, TriggerReason.AGENT_OFFLINE, context);
-
-        if (suggestions == null || suggestions.isEmpty()) {
-            log.warn("No suggestion produced for stranded order {}", order.getId());
-            return;
-        }
-
-        ReassignmentSuggestion best = suggestions.get(0);
-        if (best.getRecommendedAgent() == null) {
-            log.warn("Routing could not find agent for order {}", order.getId());
+        ReassignmentSuggestion best = resolveSuggestion(order, availableAgents, context);
+        if (best == null || best.getRecommendedAgent() == null) {
+            log.warn("Could not produce suggestion for stranded order {} — reverting to ASSIGNED", order.getId());
+            order.setStatus(OrderStatus.ASSIGNED);
+            orderRepository.save(order);
             return;
         }
 
         suggestionRepository.save(best);
         log.info("Queued AGENT_OFFLINE suggestion for order {} -> agent {}",
                 order.getId(), best.getRecommendedAgent().getId());
+    }
+
+    private ReassignmentSuggestion resolveSuggestion(Order order, List<Agent> availableAgents, RoutingContext context) {
+        List<ReassignmentSuggestion> suggestions = routingService.suggestReassignment(
+                order, availableAgents, TriggerReason.AGENT_OFFLINE, context);
+
+        if (suggestions != null && !suggestions.isEmpty() && suggestions.get(0).getRecommendedAgent() != null) {
+            return suggestions.get(0);
+        }
+
+        log.warn("Active strategy produced no agent for order {}. Falling back to rule-based.", order.getId());
+        List<ReassignmentSuggestion> fallback = ruleBasedStrategy.suggest(
+                order, availableAgents, TriggerReason.AGENT_OFFLINE, context);
+
+        if (fallback.isEmpty() || fallback.get(0).getRecommendedAgent() == null) {
+            return null;
+        }
+
+        ReassignmentSuggestion suggestion = fallback.get(0);
+        suggestion.setReasoning("Rule-based fallback: " + suggestion.getReasoning());
+        return suggestion;
     }
 }

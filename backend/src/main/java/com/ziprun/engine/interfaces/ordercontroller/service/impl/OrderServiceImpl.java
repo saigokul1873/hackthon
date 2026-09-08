@@ -13,6 +13,7 @@ import com.ziprun.engine.utils.repository.AgentRepository;
 import com.ziprun.engine.utils.repository.OrderRepository;
 import com.ziprun.engine.utils.repository.SuggestionRepository;
 import com.ziprun.engine.utils.service.RoutingService;
+import com.ziprun.engine.utils.service.AgentAvailabilityService;
 import com.ziprun.engine.exception.ZycusErrorCode;
 import com.ziprun.engine.interfaces.ordercontroller.service.OrderService;
 import org.springframework.stereotype.Service;
@@ -21,7 +22,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -34,6 +34,7 @@ public class OrderServiceImpl implements OrderService {
     private final AgentRepository agentRepository;
     private final RoutingService routingService;
     private final SuggestionRepository suggestionRepository;
+    private final AgentAvailabilityService agentAvailabilityService;
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -87,11 +88,8 @@ public class OrderServiceImpl implements OrderService {
             return existing.get();
         }
 
-        List<Agent> availableAgents = agentRepository.findByStatusIn(
-                Arrays.asList(AgentStatus.AVAILABLE, AgentStatus.BUSY));
-        if (order.getAssignedAgent() != null) {
-            availableAgents.removeIf(a -> a.getId().equals(order.getAssignedAgent().getId()));
-        }
+        List<Agent> availableAgents = agentAvailabilityService.findEligibleAgents(
+                order.getAssignedAgent() != null ? order.getAssignedAgent().getId() : null);
 
         List<ReassignmentSuggestion> suggestions = routingService.suggestReassignment(
                 order, availableAgents, TriggerReason.INITIAL);

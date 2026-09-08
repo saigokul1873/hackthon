@@ -33,6 +33,8 @@ public class RuleBasedStrategy implements RoutingStrategy {
         }
 
         return availableAgents.stream()
+                .filter(agent -> agent.getMaxCapacity() == null
+                        || agent.getActiveOrderCount() < agent.getMaxCapacity())
                 .sorted(Comparator.comparingInt(Agent::getActiveOrderCount))
                 .map(agent -> new ReassignmentSuggestion(
                         order,

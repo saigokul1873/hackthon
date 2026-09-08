@@ -28,6 +28,12 @@ public class Order {
     @Column(name = "weight_class", nullable = true)
     private String weightClass;
 
+    @Column(name = "pickup_zone", nullable = true)
+    private String pickupZone;
+
+    @Column(name = "dropoff_zone", nullable = true)
+    private String dropoffZone;
+
     public Order() {
     }
 
@@ -85,6 +91,22 @@ public class Order {
 
     public void setWeightClass(String weightClass) {
         this.weightClass = weightClass;
+    }
+
+    public String getPickupZone() {
+        return pickupZone;
+    }
+
+    public void setPickupZone(String pickupZone) {
+        this.pickupZone = pickupZone;
+    }
+
+    public String getDropoffZone() {
+        return dropoffZone;
+    }
+
+    public void setDropoffZone(String dropoffZone) {
+        this.dropoffZone = dropoffZone;
     }
 
     @Override

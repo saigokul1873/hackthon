@@ -38,7 +38,7 @@ public class OrderController {
         return ResponseEntity.ok(orderService.suggestForOrder(id));
     }
 
-    @GetMapping("/{id}/suggest/stream")
+    @RequestMapping(value = "/{id}/suggest/stream", method = {RequestMethod.GET, RequestMethod.POST})
     public SseEmitter streamSuggestion(@PathVariable String id) {
         return orderService.streamSuggestion(id);
     }

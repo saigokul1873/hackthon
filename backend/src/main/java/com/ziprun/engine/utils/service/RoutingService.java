@@ -7,7 +7,6 @@ import com.ziprun.engine.utils.enums.TriggerReason;
 import com.ziprun.engine.exception.ZycusErrorCode;
 import com.ziprun.engine.utils.routing.RoutingContext;
 import com.ziprun.engine.utils.routing.RoutingStrategy;
-import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,15 +15,12 @@ import java.util.Map;
 @Service
 public class RoutingService {
 
-    private static final String DEFAULT_STRATEGY = "ruleBased";
-
     private final Map<String, RoutingStrategy> strategies;
-    private final Environment environment;
+    private final RoutingStrategyHolder strategyHolder;
 
-    public RoutingService(Map<String, RoutingStrategy> strategies, Environment environment) {
+    public RoutingService(Map<String, RoutingStrategy> strategies, RoutingStrategyHolder strategyHolder) {
         this.strategies = strategies;
-        this.environment = environment;
-        validateActiveStrategyName(resolveActiveStrategyName());
+        this.strategyHolder = strategyHolder;
     }
 
     public List<ReassignmentSuggestion> suggestReassignment(Order order, List<Agent> availableAgents,
@@ -34,7 +30,7 @@ public class RoutingService {
 
     public List<ReassignmentSuggestion> suggestReassignment(Order order, List<Agent> availableAgents,
                                                             TriggerReason triggerReason, RoutingContext context) {
-        String strategyName = resolveActiveStrategyName();
+        String strategyName = strategyHolder.getActiveStrategy();
         RoutingStrategy strategy = strategies.get(strategyName);
         if (strategy == null) {
             throw ZycusErrorCode.ROUTING_STRATEGY_NOT_FOUND.exception(strategyName);
@@ -43,21 +39,10 @@ public class RoutingService {
     }
 
     public String getActiveStrategyName() {
-        return resolveActiveStrategyName();
+        return strategyHolder.getActiveStrategy();
     }
 
-    private String resolveActiveStrategyName() {
-        String strategy = environment.getProperty("routing.strategy");
-        if (strategy == null || strategy.isBlank()) {
-            strategy = environment.getProperty("routing.active-strategy", DEFAULT_STRATEGY);
-        }
-        return strategy;
-    }
-
-    private void validateActiveStrategyName(String strategyName) {
-        if (!strategies.containsKey(strategyName)) {
-            throw ZycusErrorCode.ROUTING_STRATEGY_NOT_FOUND.exception(
-                    strategyName + ". Available: " + strategies.keySet());
-        }
+    public void setActiveStrategy(String strategyName) {
+        strategyHolder.setActiveStrategy(strategyName);
     }
 }
